@@ -34,6 +34,7 @@ const elements = {
     charCounter: document.getElementById('char-counter'),
     closeShareBar: document.getElementById('close-share-bar'),
     tweetSelectedBtn: document.getElementById('tweet-selected-btn'),
+    exportCsvBtn: document.getElementById('export-csv-btn'),
     
     toast: document.getElementById('toast')
 };
@@ -104,6 +105,11 @@ function setupEventListeners() {
     elements.tweetSelectedBtn.addEventListener('click', () => {
         shareOnX(elements.tweetTextarea.value);
     });
+
+    // Export CSV Button
+    elements.exportCsvBtn.addEventListener('click', () => {
+        exportFilteredToCSV();
+    });
     
     // Textarea character count and validation
     elements.tweetTextarea.addEventListener('input', (e) => {
@@ -139,6 +145,7 @@ async function fetchReleaseNotes(forceRefresh = false) {
             
             elements.updateCount.textContent = `${totalItems} Updates`;
             elements.statsBadge.classList.add('active');
+            elements.exportCsvBtn.disabled = false;
             
             showState('list');
             renderFeed();
@@ -163,12 +170,14 @@ function setLoadingState(loading) {
     state.isLoading = loading;
     if (loading) {
         elements.refreshBtn.disabled = true;
+        elements.exportCsvBtn.disabled = true;
         elements.refreshIcon.classList.add('hidden');
         elements.spinner.classList.remove('hidden');
         elements.btnText.textContent = "Loading...";
         showState('loading');
     } else {
         elements.refreshBtn.disabled = false;
+        elements.exportCsvBtn.disabled = (state.releaseNotes.length === 0);
         elements.refreshIcon.classList.remove('hidden');
         elements.spinner.classList.add('hidden');
         elements.btnText.textContent = "Refresh";
@@ -282,6 +291,13 @@ function createNoteCard(date, item) {
             ${item.body}
         </div>
         <div class="card-actions">
+            <button class="btn-card-copy" title="Copy clean update text to clipboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copy</span>
+            </button>
             <button class="btn-card-tweet" title="Immediately Tweet this update">
                 <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -291,6 +307,20 @@ function createNoteCard(date, item) {
         </div>
     `;
     
+    // Prevent Copy button from triggering card selection
+    const copyBtn = card.querySelector('.btn-card-copy');
+    copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cleanText = parseHtmlToTwitterText(item.body);
+        const copyText = `BigQuery [${item.category}] (${date}):\n${cleanText}`;
+        navigator.clipboard.writeText(copyText).then(() => {
+            showToast("Copied to clipboard!");
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+            showToast("Failed to copy text.");
+        });
+    });
+
     // Prevent Quick Tweet button from triggering card selection
     const tweetBtn = card.querySelector('.btn-card-tweet');
     tweetBtn.addEventListener('click', (e) => {
@@ -453,4 +483,71 @@ function showToast(message) {
     toastTimeout = setTimeout(() => {
         elements.toast.classList.add('hidden');
     }, 3500);
+}
+
+// Export Filtered Release Notes to CSV
+function exportFilteredToCSV() {
+    if (!state.releaseNotes || state.releaseNotes.length === 0) {
+        showToast("No release notes available to export.");
+        return;
+    }
+    
+    const csvRows = [];
+    // Add Headers
+    csvRows.push(['Date', 'Category', 'Description (Plaintext)', 'Original HTML']);
+    
+    state.releaseNotes.forEach(entry => {
+        entry.items.forEach(item => {
+            // Apply current filters
+            const matchesCategory = state.categoryFilter === 'all' || 
+                item.category.toLowerCase() === state.categoryFilter.toLowerCase();
+            
+            const matchesSearch = state.searchQuery === '' || 
+                item.category.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
+                stripHtml(item.body).toLowerCase().includes(state.searchQuery.toLowerCase());
+                
+            if (matchesCategory && matchesSearch) {
+                const cleanDesc = parseHtmlToTwitterText(item.body);
+                csvRows.push([
+                    entry.date,
+                    item.category,
+                    cleanDesc,
+                    item.body
+                ]);
+            }
+        });
+    });
+    
+    if (csvRows.length <= 1) {
+        showToast("No release notes match the current filters.");
+        return;
+    }
+    
+    // Convert to CSV string, escape double quotes
+    const csvContent = csvRows.map(row => 
+        row.map(val => {
+            const textVal = val ? String(val) : '';
+            return '"' + textVal.replace(/"/g, '""') + '"';
+        }).join(',')
+    ).join('\n');
+    
+    // Download trigger
+    try {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        
+        const timestamp = new Date().toISOString().split('T')[0];
+        link.setAttribute("download", `bigquery_release_notes_${timestamp}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showToast("CSV Export downloaded!");
+    } catch (e) {
+        console.error("CSV Export failed", e);
+        showToast("CSV Export failed.");
+    }
 }
