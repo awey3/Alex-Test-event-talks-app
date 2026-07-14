@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BigQuery Release Pulse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2005/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1>BigQuery Release Pulse</h1>
+                    <p>Track, filter, and share Google BigQuery updates in real-time</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <!-- Stat display -->
+                <div class="stats-badge" id="stats-badge">
+                    <span class="pulse-dot"></span>
+                    <span id="update-count">Loading...</span>
+                </div>
+                
+                <!-- Refresh Button -->
+                <button id="refresh-btn" class="btn btn-secondary" title="Fetch latest release notes">
+                    <svg id="refresh-icon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2005/svg">
+                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z" fill="currentColor"/>
+                    </svg>
+                    <span id="spinner" class="spinner hidden"></span>
+                    <span id="btn-text">Refresh</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Search and Filter Panel -->
+        <section class="controls-panel">
+            <div class="search-wrapper">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2005/svg">
+                    <path d="M15.5 14H14.71L14.43 13.73C15.41 12.59 16 11.11 16 9.5C16 5.91 13.09 3 9.5 3C5.91 3 3 5.91 3 9.5C3 13.09 5.91 16 9.5 16C11.11 16 12.59 15.41 13.73 14.43L14 14.71V15.5L19 20.49L20.49 19L15.5 14ZM9.5 14C7.01 14 5 11.99 5 9.5C5 7.01 7.01 5 9.5 5C11.99 5 14 7.01 14 9.5C14 11.99 11.99 14 9.5 14Z" fill="currentColor"/>
+                </svg>
+                <input type="text" id="search-input" placeholder="Search keywords (e.g. partition, JSON, GA)..." autocomplete="off">
+                <button id="clear-search-btn" class="clear-btn hidden" title="Clear search">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2005/svg">
+                        <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="filters-wrapper">
+                <span class="filter-label">Categories:</span>
+                <div class="filter-chips">
+                    <button class="chip active" data-filter="all">All</button>
+                    <button class="chip" data-filter="Feature">Features</button>
+                    <button class="chip" data-filter="Change">Changes</button>
+                    <button class="chip" data-filter="Security">Security</button>
+                    <button class="chip" data-filter="Deprecation">Deprecations</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Feed Grid -->
+        <main class="feed-content">
+            <!-- Loading State -->
+            <div id="feed-loading" class="state-container">
+                <div class="loading-pulse-animation"></div>
+                <p>Syncing release feed...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="feed-error" class="state-container hidden">
+                <div class="error-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2005/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h3>Failed to load release notes</h3>
+                <p id="error-message">Could not communicate with the backend server.</p>
+                <button id="retry-btn" class="btn btn-primary">Retry</button>
+            </div>
+
+            <!-- Empty State -->
+            <div id="feed-empty" class="state-container hidden">
+                <div class="empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2005/svg">
+                        <path d="M15.5 14H14.71L14.43 13.73C15.41 12.59 16 11.11 16 9.5C16 5.91 13.09 3 9.5 3C5.91 3 3 5.91 3 9.5C3 13.09 5.91 16 9.5 16C11.11 16 12.59 15.41 13.73 14.43L14 14.71V15.5L19 20.49L20.49 19L15.5 14ZM9.5 14C7.01 14 5 11.99 5 9.5C5 7.01 7.01 5 9.5 5C11.99 5 14 7.01 14 9.5C14 11.99 11.99 14 9.5 14Z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h3>No release notes match your query</h3>
+                <p>Try clearing your search or choosing a different category filter.</p>
+                <button id="clear-filters-btn" class="btn btn-secondary">Clear Filters</button>
+            </div>
+
+            <!-- Release Notes List -->
+            <div id="release-notes-list" class="notes-list hidden">
+                <!-- Grouped by Date dynamic elements will go here -->
+            </div>
+        </main>
+
+        <!-- Floating Share Action Bar -->
+        <section id="share-action-bar" class="share-bar hidden">
+            <div class="share-bar-container">
+                <div class="share-bar-info">
+                    <span class="selection-indicator">
+                        <span class="selection-count" id="selection-count">0</span> Selected
+                    </span>
+                    <p class="share-bar-hint">Select a note to preview and compose your Tweet.</p>
+                </div>
+                
+                <div class="tweet-composer-preview">
+                    <div class="composer-header">
+                        <span class="composer-title">Draft Tweet</span>
+                        <span class="char-counter" id="char-counter">0/280</span>
+                    </div>
+                    <textarea id="tweet-textarea" rows="3" placeholder="Compose your tweet..."></textarea>
+                </div>
+                
+                <div class="share-bar-buttons">
+                    <button id="close-share-bar" class="btn btn-icon-only" title="Cancel selection">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2005/svg">
+                            <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                    <button id="tweet-selected-btn" class="btn btn-primary btn-tweet">
+                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2005/svg">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        </svg>
+                        <span>Tweet Update</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Toast Notification -->
+        <div id="toast" class="toast hidden"></div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

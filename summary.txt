@@ -1,0 +1,9 @@
+Summary of World News (July 13, 2026)
+
+This summary condenses the major global events recorded in news.txt:
+
+1. U.S.-Iran Escalation: The ceasefire has collapsed, leading to U.S. airstrikes against Iranian military sites and the reimposition of a blockade on the Strait of Hormuz by President Donald Trump.
+2. Passing of Lindsey Graham: U.S. Senator Lindsey Graham died at age 71 from an aortic dissection.
+3. Syria Parliament: Syria's newly elected parliament convened its first session under calls for a new chapter from President Ahmad al-Sharaa.
+4. Ukraine Strikes: Ukraine expanded its strike campaign targeting Russian transport and logistics routes to Crimea.
+5. Chikungunya Outbreak: A health alert was issued for a chikungunya outbreak in Playa Langosta, Costa Rica.
