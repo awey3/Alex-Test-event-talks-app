@@ -321,6 +321,26 @@ function createNoteCard(date, item) {
         });
     });
 
+    // Make individual <code> blocks copyable
+    const codeBlocks = card.querySelectorAll('.card-body code');
+    codeBlocks.forEach(codeEl => {
+        codeEl.setAttribute('title', 'Click to copy code snippet');
+        codeEl.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent card selection
+            const codeText = codeEl.textContent || codeEl.innerText;
+            navigator.clipboard.writeText(codeText).then(() => {
+                codeEl.classList.add('copied-flash');
+                showToast(`Copied code: "${codeText}"`);
+                setTimeout(() => {
+                    codeEl.classList.remove('copied-flash');
+                }, 1000);
+            }).catch(err => {
+                console.error('Failed to copy code: ', err);
+                showToast("Failed to copy code.");
+            });
+        });
+    });
+
     // Prevent Quick Tweet button from triggering card selection
     const tweetBtn = card.querySelector('.btn-card-tweet');
     tweetBtn.addEventListener('click', (e) => {
